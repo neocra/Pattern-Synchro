@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using SQLite;
 
 namespace Pattern.Synchro.Client
@@ -67,10 +66,7 @@ namespace Pattern.Synchro.Client
                     }
                 }
 
-                var json = JsonConvert.SerializeObject(synchroDevice, new JsonSerializerSettings
-                {
-                    PreserveReferencesHandling = PreserveReferencesHandling.All
-                });
+                var json = await Serializer.Serialize(synchroDevice);
 
                 httpRequestMessage.Content = new StringContent(json, Encoding.UTF8, "application/json");
                 
@@ -93,12 +89,8 @@ namespace Pattern.Synchro.Client
                 
                 var httpResponseMessage = await this.httpClient.SendAsync(httpRequestMessage);
                 
-                var response = await httpResponseMessage.Content.ReadAsStringAsync();
 
-                var synchroDevice = JsonConvert.DeserializeObject<SynchroDevice>(response, new JsonSerializerSettings
-                {
-                    PreserveReferencesHandling = PreserveReferencesHandling.All
-                });
+                var synchroDevice = await Serializer.Deserialize<SynchroDevice>(await httpResponseMessage.Content.ReadAsStreamAsync());
 
                 return synchroDevice;               
             }
@@ -119,10 +111,7 @@ namespace Pattern.Synchro.Client
                 var lastUpdated = synchroDevice.LastLocalSyncDateTime;
                 var entities = await this.GetPushEntities(lastUpdated);
 
-                var json = JsonConvert.SerializeObject(entities, new JsonSerializerSettings
-                {
-                    PreserveReferencesHandling = PreserveReferencesHandling.All
-                });
+                var json = await Serializer.Serialize(entities);
                 
                 httpRequestMessage.Content = new StringContent(json, Encoding.UTF8, "application/json");
                 
@@ -157,12 +146,7 @@ namespace Pattern.Synchro.Client
                 
                 var httpResponseMessage = await this.httpClient.SendAsync(httpRequestMessage);
                 
-                var response = await httpResponseMessage.Content.ReadAsStringAsync();
-
-                var cars = JsonConvert.DeserializeObject<List<IEntity>>(response, new JsonSerializerSettings
-                {
-                    PreserveReferencesHandling = PreserveReferencesHandling.All
-                });
+                var cars = await Serializer.Deserialize<List<IEntity>>(await httpResponseMessage.Content.ReadAsStreamAsync());
 
                 foreach (var car in cars)
                 {

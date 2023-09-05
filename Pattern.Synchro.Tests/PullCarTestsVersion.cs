@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Pattern.Synchro.Api;
 using Pattern.Synchro.Sample.Api;
-using Pattern.Synchro.Sample.Client;
 using Xunit;
 using Car = Pattern.Synchro.Sample.Client.Car;
 
