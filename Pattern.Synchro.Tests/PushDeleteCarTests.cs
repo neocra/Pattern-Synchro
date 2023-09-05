@@ -10,7 +10,7 @@ namespace Pattern.Synchro.Tests
 {
     public class PushDeleteCarTests : BaseTests
     {
-        public PushDeleteCarTests(WebApplicationFactory<Startup> factory) : base(factory)
+        public PushDeleteCarTests(WebApplicationFactory<Startup> factory, DbContextClassFixture dbContextClassFixture) : base(factory, dbContextClassFixture)
         {
         }
 

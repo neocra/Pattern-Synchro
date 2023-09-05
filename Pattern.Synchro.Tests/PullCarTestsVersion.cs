@@ -11,7 +11,7 @@ namespace Pattern.Synchro.Tests
 {
     public class PullCarTestsVersion : BaseTests
     {
-        public PullCarTestsVersion(WebApplicationFactory<Startup> factory) : base(factory)
+        public PullCarTestsVersion(WebApplicationFactory<Startup> factory, DbContextClassFixture dbContextClassFixture) : base(factory, dbContextClassFixture)
         {
         }
         

@@ -12,7 +12,7 @@ namespace Pattern.Synchro.Tests
 {
     public class PullHttpErrorCarTests : BaseTests
     {
-        public PullHttpErrorCarTests(WebApplicationFactory<Startup> factory) : base(factory)
+        public PullHttpErrorCarTests(WebApplicationFactory<Startup> factory, DbContextClassFixture dbContextClassFixture) : base(factory, dbContextClassFixture)
         {
         }
 

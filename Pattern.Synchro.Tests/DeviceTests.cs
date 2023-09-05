@@ -15,7 +15,7 @@ namespace Pattern.Synchro.Tests
 {
     public class DeviceTests : BaseTests
     {
-        public DeviceTests(WebApplicationFactory<Startup> factory) : base(factory)
+        public DeviceTests(WebApplicationFactory<Startup> factory, DbContextClassFixture dbContextClassFixture) : base(factory, dbContextClassFixture)
         {
         }
         

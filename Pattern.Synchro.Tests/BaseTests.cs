@@ -19,8 +19,9 @@ using Car = Pattern.Synchro.Sample.Client.Car;
 namespace Pattern.Synchro.Tests
 {
     [Collection("Tests")]
-    public class BaseTests : IClassFixture<WebApplicationFactory<Startup>>, IDisposable
+    public class BaseTests : IClassFixture<WebApplicationFactory<Startup>>, IClassFixture<DbContextClassFixture>, IDisposable
     {
+        private readonly DbContextClassFixture dbContextClassFixture;
         private readonly HttpClient httpClient;
         private readonly string serverDatabaseName;
         protected SQLiteAsyncConnection localDb;
@@ -30,8 +31,9 @@ namespace Pattern.Synchro.Tests
         protected IDateTimeService datimeService;
         protected IServerCallback serverCallback;
 
-        public BaseTests(WebApplicationFactory<Startup> factory)
+        public BaseTests(WebApplicationFactory<Startup> factory, DbContextClassFixture dbContextClassFixture)
         {
+            this.dbContextClassFixture = dbContextClassFixture;
             this.deviceId = Guid.NewGuid();
             this.serverDatabaseName = this.GetType().Name;
             this.localDatabaseName = this.GetType().Name + "local";
@@ -50,8 +52,7 @@ namespace Pattern.Synchro.Tests
             
             this.httpClient.DefaultRequestHeaders.Add("UserId", "1");
 
-            this.GetDbContext().Database.EnsureCreated();
-
+            dbContextClassFixture.InitDbContext(this.serverDatabaseName);
             this.localDb = new SQLiteAsyncConnection(this.localDatabaseName);
             Task.WaitAll(this.localDb.CreateTableAsync<Car>());
 
@@ -61,24 +62,16 @@ namespace Pattern.Synchro.Tests
             this.client.DeviceId = deviceId;
         }
 
-        private SampleDbContext GetDbContext()
-        {
-            var options = new DbContextOptionsBuilder<SampleDbContext>()
-                .UseSqlite($"Data Source={this.serverDatabaseName}")
-                .Options;
-
-            return new SampleDbContext(options);
-        }
+       
 
         protected async Task AddServer<T>(T obj) where T : class
         {
-            using (var db = this.GetDbContext())
-            {
-                await db.Set<T>().AddAsync(obj);
-                await db.SaveChangesAsync();
-            }
+            var db = this.dbContextClassFixture.DbContext;
+            await db.Set<T>().AddAsync(obj);
+            await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
         }
-        
+
         protected async Task AddLocal<T>(T obj)
         {
             await this.localDb.InsertOrReplaceAsync(obj);
@@ -104,18 +97,17 @@ namespace Pattern.Synchro.Tests
             Xunit.Assert.NotNull(entity);
             Xunit.Assert.True(entity.Count == count);
         }
-        
+
         protected async Task AssertServer<T>(Func<T, bool> predicate) where T : class, new()
         {
-            using (var db = this.GetDbContext())
-            {
-                var entity = await db.Set<T>().ToListAsync();
+            var db = this.dbContextClassFixture.DbContext;
 
-                Xunit.Assert.NotNull(entity);
-                Xunit.Assert.True(entity.Count(predicate) == 1);
-            }
+            var entity = await db.Set<T>().ToListAsync();
+
+            Xunit.Assert.NotNull(entity);
+            Xunit.Assert.True(entity.Count(predicate) == 1);
         }
-        
+
         public void Dispose()
         {
             Task.WaitAll(this.localDb.CloseAsync());
