@@ -2,6 +2,9 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -14,9 +17,36 @@ using Pattern.Synchro.Sample.Api;
 using SQLite;
 using Xunit;
 using Car = Pattern.Synchro.Sample.Client.Car;
+using Serializer = Pattern.Synchro.Api.Serializer;
 
 namespace Pattern.Synchro.Tests
 {
+    public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
+    {
+        public override JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options)
+        {
+            JsonTypeInfo jsonTypeInfo = base.GetTypeInfo(type, options);
+
+            var basePointType = typeof(IEntity);
+            if (jsonTypeInfo.Type == basePointType)
+            {
+                jsonTypeInfo.PolymorphismOptions = new JsonPolymorphismOptions
+                {
+                    TypeDiscriminatorPropertyName = "typename",
+                    IgnoreUnrecognizedTypeDiscriminators = false,
+                    UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization,
+                    DerivedTypes =
+                    {
+                        new JsonDerivedType(typeof(Car), "Car"),
+                    }
+                };
+            }
+
+            return jsonTypeInfo;
+        }
+    }
+    
+    
     [Collection("Tests")]
     public class BaseTests : IClassFixture<WebApplicationFactory<Startup>>, IClassFixture<DbContextClassFixture>, IDisposable
     {
@@ -32,6 +62,8 @@ namespace Pattern.Synchro.Tests
 
         public BaseTests(WebApplicationFactory<Startup> factory, DbContextClassFixture dbContextClassFixture)
         {
+            Serializer.TypeInfoResolver = new PolymorphicTypeResolver();
+            Client.Serializer.TypeInfoResolver = new PolymorphicTypeResolver();
             this.dbContextClassFixture = dbContextClassFixture;
             this.deviceId = Guid.NewGuid();
             this.serverDatabaseName = this.GetType().Name;
@@ -72,7 +104,12 @@ namespace Pattern.Synchro.Tests
         }
 
         protected async Task AddLocal<T>(T obj)
+            where T: IEntity
         {
+            if (obj.LastUpdated == DateTime.MinValue)
+            {
+                obj.LastUpdated = DateTime.MinValue;
+            }
             await this.localDb.InsertOrReplaceAsync(obj);
         }
         
@@ -100,6 +137,7 @@ namespace Pattern.Synchro.Tests
         protected async Task AssertServer<T>(Func<T, bool> predicate) where T : class, new()
         {
             var db = this.dbContextClassFixture.DbContext;
+            db.ChangeTracker.Clear();
 
             var entity = await db.Set<T>().ToListAsync();
 

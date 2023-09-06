@@ -1,30 +1,37 @@
 using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
-namespace Pattern.Synchro;
+#if NETSTANDARD2_0
+namespace Pattern.Synchro.Client;
+#else
+namespace Pattern.Synchro.Api;
+#endif
 
 public class Serializer
 {
+    public static IJsonTypeInfoResolver TypeInfoResolver { get; set; }
+    
     public static async Task<T> Deserialize<T>(Stream stream)
     {
-        var streamReader = new StreamReader(stream);
-
-        var entities = JsonConvert.DeserializeObject<T>(
-            await streamReader.ReadToEndAsync().ConfigureAwait(false),
-            new JsonSerializerSettings
-            {
-                PreserveReferencesHandling = PreserveReferencesHandling.All
-            });
+        var text = await new StreamReader(stream).ReadToEndAsync();
+        
+        var entities = JsonSerializer.Deserialize<T>(text, new JsonSerializerOptions
+        {
+            TypeInfoResolver = TypeInfoResolver,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
         return entities;
     }
     
-    public static async Task<string> Serialize<T>(T synchroDevice)
+    public static Task<string> Serialize<T>(T synchroDevice)
     {
-        return JsonConvert.SerializeObject(synchroDevice,
-            new JsonSerializerSettings
-            {
-                PreserveReferencesHandling = PreserveReferencesHandling.All
-            });
+        var serialize = JsonSerializer.Serialize((object)synchroDevice, new JsonSerializerOptions
+        {
+            TypeInfoResolver = TypeInfoResolver,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+        return Task.FromResult(serialize);
     }
 }

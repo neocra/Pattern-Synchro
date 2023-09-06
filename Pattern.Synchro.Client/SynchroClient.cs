@@ -29,7 +29,7 @@ namespace Pattern.Synchro.Client
 
             try
             {
-                var beginLocalDateTime = DateTime.Now;
+                var beginLocalDateTime = DateTime.UtcNow;
                 var synchroDevice = await this.Begin(headers);
 
                 await this.Push(headers, synchroDevice, version);

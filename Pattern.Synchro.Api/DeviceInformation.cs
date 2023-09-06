@@ -35,7 +35,7 @@ namespace Pattern.Synchro.Api
 
             if (deviceLastLocalSynchro.HasValue)
             {
-                return new DateTime(deviceLastLocalSynchro.Value.Ticks, DateTimeKind.Local);
+                return new DateTime(deviceLastLocalSynchro.Value.Ticks, DateTimeKind.Unspecified);
             }
 
             return null;
