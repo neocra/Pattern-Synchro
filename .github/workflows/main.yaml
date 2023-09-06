@@ -38,8 +38,6 @@ jobs:
         run: dotnet build --configuration Release
       - name: Test
         run: dotnet test --configuration Release --no-build  --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
-      - name: Copy coverage
-        run: cp Pattern.Synchro.Tests/TestResults/*/coverage.opencover.xml .
       - name: End scan
         run: dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
         env:
