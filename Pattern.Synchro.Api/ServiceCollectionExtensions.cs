@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Pattern.Synchro.Api.Pull;
+using Pattern.Synchro.Api.Push;
 
 namespace Pattern.Synchro.Api
 {
@@ -9,6 +11,7 @@ namespace Pattern.Synchro.Api
             serviceCollection.AddTransient<IDateTimeService, DateTimeService>();
             serviceCollection.AddTransient<SynchroMiddleWare>();
             serviceCollection.AddTransient<IServerPushSynchro, PushSynchro>();
+            serviceCollection.AddTransient<IPullSynchro, PullSynchro>();
         }
     }
 }

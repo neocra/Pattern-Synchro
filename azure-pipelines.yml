@@ -8,7 +8,7 @@ trigger:
 - develop
 
 pool:
-  vmImage: 'VS2017-Win2016'
+  vmImage: 'windows-latest'
 
 variables:
   solution: '**/*.sln'
@@ -16,17 +16,16 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
-- task: gittools.gitversion.gitversion-task.GitVersion@4
-  displayName: GitVersion
+- task: GitVersion@5
   inputs:
-    preferBundledVersion: false
+    runtime: 'core'
 
 - task: colinsalmcorner.colinsalmcorner-buildtasks.version-assemblies-task.VersionAssemblies@2
   displayName: 'Version Assemblies using **/*.csproj'
   inputs:
     filePattern: '**/*.csproj'
     versionSource: variable
-    customNumberVariable: GitVersion.NuGetVersionV2
+    customNumberVariable: GitVersion.NuGetVersion
     versionFormat: threeParts
     replaceVersionFormat: custom
     customReplaceRegex: '<VersionPrefix>\d+\.\d+\.\d+\.\d+</VersionPrefix>'
@@ -34,6 +33,9 @@ steps:
     replacePostfix: '</VersionPrefix>'
 
 - task: NuGetToolInstaller@0
+  displayName: 'Use NuGet 5.5.0'
+  inputs:
+    versionSpec: '5.5.0'
 
 - task: NuGetCommand@2
   inputs:

@@ -1,17 +1,17 @@
 using System;
 using Pattern.Synchro.Client;
-using SQLite;
 
-namespace Pattern.Synchro.Sample.Client
+namespace Pattern.Synchro.Sample.Api
 {
-    public class Car : IEntity
+    public class CarV2 : IEntity
     {
-        [PrimaryKey]
         public Guid Id { get; set; }
-        
-        public DateTime LastUpdated { get; set; }
 
         public string Name { get; set; }
+
+        public DateTime LastUpdated { get; set; }
+        
+        public string UserId { get; set; }
         
         public bool IsDeleted { get; set; }
     }

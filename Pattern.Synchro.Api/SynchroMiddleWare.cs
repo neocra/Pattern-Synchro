@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Newtonsoft.Json;
+using Pattern.Synchro.Api.Pull;
+using Pattern.Synchro.Api.Push;
 using Pattern.Synchro.Client;
 
 namespace Pattern.Synchro.Api
@@ -15,17 +15,20 @@ namespace Pattern.Synchro.Api
         private readonly IServerPushSynchro serverPushSynchro;
         private readonly IDeviceInformation deviceInformation;
         private readonly IDateTimeService dateTimeService;
+        private readonly IServerCallback serverCallback;
 
         public SynchroMiddleWare(
             IPullSynchro pullSynchro, 
             IServerPushSynchro serverPushSynchro, 
             IDeviceInformation deviceInformation,
-            IDateTimeService dateTimeService)
+            IDateTimeService dateTimeService,
+            IServerCallback serverCallback)
         {
             this.pullSynchro = pullSynchro;
             this.serverPushSynchro = serverPushSynchro;
             this.deviceInformation = deviceInformation;
             this.dateTimeService = dateTimeService;
+            this.serverCallback = serverCallback;
         }
 
         public async Task InvokeAsync(HttpContext context, RequestDelegate next)
@@ -33,64 +36,48 @@ namespace Pattern.Synchro.Api
             if (context.Request.Path.Value.StartsWith("/synchro/end"))
             {
                 var deviceId = Guid.Parse(context.Request.Query["deviceId"]);
-                var streamReader = new StreamReader(context.Request.Body);
+                var entities = await Serializer.Deserialize<SynchroDevice>(context.Request.Body);
+                await this.deviceInformation.SaveLastSynchro(context, deviceId, entities.BeginServerDateTime, entities.LastLocalSyncDateTime, entities.Version).ConfigureAwait(false);
+                return;
+            }
 
-                var entities = JsonConvert.DeserializeObject<SynchroDevice>(streamReader.ReadToEnd(),
-                    new JsonSerializerSettings()
-                    {
-                        TypeNameHandling = TypeNameHandling.All,
-                        PreserveReferencesHandling = PreserveReferencesHandling.All
-                    });
-                await this.deviceInformation.SaveLastSynchro(deviceId, entities.BeginServerDateTime);
+            if (context.Request.Path.Value.StartsWith("/synchro/begin"))
+            {
+                await this.serverCallback.Begin(context.Request.Headers).ConfigureAwait(false);
+                
+                var deviceId = Guid.Parse(context.Request.Query["deviceId"]);
+                var bytes = Encoding.UTF8.GetBytes(await Serializer.Serialize(new SynchroDevice
+                {
+                    BeginServerDateTime = this.dateTimeService.DateTimeNow(),
+                    LastLocalSyncDateTime = (await this.deviceInformation.GetLastLocalSynchro(context, deviceId)) ?? DateTime.MinValue,
+                }));
+                await context.Response.Body.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
                 return;
             }
-            else if (context.Request.Path.Value.StartsWith("/synchro/begin"))
+
+            if (context.Request.Path.Value.StartsWith("/synchro"))
             {
-                var bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new SynchroDevice()
-                    {
-                        BeginServerDateTime = this.dateTimeService. DateTimeNow()
-                    },
-                    new JsonSerializerSettings()
-                    {
-                        TypeNameHandling = TypeNameHandling.All,
-                        PreserveReferencesHandling = PreserveReferencesHandling.All
-                    }));
-                await context.Response.Body.WriteAsync(bytes, 0, bytes.Length);
-                return;
-            }
-            else if (context.Request.Path.Value.StartsWith("/synchro"))
-            {
-                switch (context.Request.Method)
+                var version = context.Request.Query.ContainsKey("version") ? int.Parse(context.Request.Query["version"]) : 0;
+                switch (context.Request.Method.ToUpperInvariant())
                 {
                     case "GET":
                         var deviceId = Guid.Parse(context.Request.Query["deviceId"]);
-                        var lastSynchro = await this.deviceInformation.GetLastSynchro(deviceId) ?? DateTime.MinValue;
+                        var previousVersion = (await this.deviceInformation.GetVersion(context, deviceId)) ?? version;
+                        var lastSynchro = await this.deviceInformation.GetLastSynchro(context, deviceId).ConfigureAwait(false) ?? DateTime.MinValue;
 
-                        var cars = this.pullSynchro.GetPull(lastSynchro);
+                        var cars = this.pullSynchro.GetPull(context, lastSynchro, previousVersion, version);
 
-                        var bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(cars,
-                            new JsonSerializerSettings()
-                            {
-                                TypeNameHandling = TypeNameHandling.All,
-                                PreserveReferencesHandling = PreserveReferencesHandling.All
-                            }));
-                        await context.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+                        var bytes = Encoding.UTF8.GetBytes(await Serializer.Serialize(cars));
+                        await context.Response.Body.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
                         return;
                     case "POST":
-                        var streamReader = new StreamReader(context.Request.Body);
-
-                        var entities = JsonConvert.DeserializeObject<List<IEntity>>(streamReader.ReadToEnd(),
-                            new JsonSerializerSettings()
-                            {
-                                TypeNameHandling = TypeNameHandling.All,
-                                PreserveReferencesHandling = PreserveReferencesHandling.All
-                            });
-                        await this.serverPushSynchro.Push(entities);
+                        var entities = await Serializer.Deserialize<List<IEntity>>(context.Request.Body);
+                        await this.serverPushSynchro.Push(context, entities, version).ConfigureAwait(false);
                         return;
                 }
             }
 
-            await next(context);
+            await next(context).ConfigureAwait(false);
         }
     }
 }
