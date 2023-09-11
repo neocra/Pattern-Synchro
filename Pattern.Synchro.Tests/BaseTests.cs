@@ -2,9 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -17,36 +14,9 @@ using Pattern.Synchro.Sample.Api;
 using SQLite;
 using Xunit;
 using Car = Pattern.Synchro.Sample.Client.Car;
-using Serializer = Pattern.Synchro.Api.Serializer;
 
 namespace Pattern.Synchro.Tests
 {
-    public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
-    {
-        public override JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options)
-        {
-            JsonTypeInfo jsonTypeInfo = base.GetTypeInfo(type, options);
-
-            var basePointType = typeof(IEntity);
-            if (jsonTypeInfo.Type == basePointType)
-            {
-                jsonTypeInfo.PolymorphismOptions = new JsonPolymorphismOptions
-                {
-                    TypeDiscriminatorPropertyName = "typename",
-                    IgnoreUnrecognizedTypeDiscriminators = false,
-                    UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization,
-                    DerivedTypes =
-                    {
-                        new JsonDerivedType(typeof(Car), "Car"),
-                    }
-                };
-            }
-
-            return jsonTypeInfo;
-        }
-    }
-    
-    
     [Collection("Tests")]
     public class BaseTests : IClassFixture<WebApplicationFactory<Startup>>, IClassFixture<DbContextClassFixture>, IDisposable
     {
@@ -55,15 +25,13 @@ namespace Pattern.Synchro.Tests
         private readonly string serverDatabaseName;
         protected SQLiteAsyncConnection localDb;
         protected SynchroClient client;
-        private string localDatabaseName;
+        private readonly string localDatabaseName;
         protected Guid deviceId;
         protected IDateTimeService datimeService;
         protected IServerCallback serverCallback;
 
         public BaseTests(WebApplicationFactory<Startup> factory, DbContextClassFixture dbContextClassFixture)
         {
-            Serializer.TypeInfoResolver = new PolymorphicTypeResolver();
-            Client.Serializer.TypeInfoResolver = new PolymorphicTypeResolver();
             this.dbContextClassFixture = dbContextClassFixture;
             this.deviceId = Guid.NewGuid();
             this.serverDatabaseName = this.GetType().Name;
@@ -88,7 +56,10 @@ namespace Pattern.Synchro.Tests
             Task.WaitAll(this.localDb.CreateTableAsync<Car>());
 
             this.client = new SynchroClient(this.httpClient, this.localDb,
-                new[] {new ClientPushSynchro<Car>(this.localDb)});
+                new[] {new ClientPushSynchro<Car>(this.localDb)}, new TypeToSync[]
+                {
+                    new TypeToSync(typeof(Car))
+                });
 
             this.client.DeviceId = deviceId;
         }

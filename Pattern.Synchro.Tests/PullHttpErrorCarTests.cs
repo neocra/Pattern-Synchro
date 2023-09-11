@@ -29,7 +29,10 @@ namespace Pattern.Synchro.Tests
             var httpClient1 = new HttpClient(new ErrorHttpHandler());
             httpClient1.BaseAddress = new Uri("http://localhost/");
             this.client = new SynchroClient(httpClient1, this.localDb,
-                new[] {new ClientPushSynchro<Car>(this.localDb)});
+                new[] {new ClientPushSynchro<Car>(this.localDb)}, new []
+                {
+                    new TypeToSync(typeof(Car))
+                });
 
             this.client.DeviceId = deviceId;
 
